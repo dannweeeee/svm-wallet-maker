@@ -16,7 +16,7 @@ class SolanaWalletGenerator:
         """
         Derives the Solana address and private key using the BIP-44 standard.
         :param account_index: Index of the account in the derivation path.
-        :return: A tuple containing the Solana public address and Base58-encoded private key.
+        :return: A tuple containing the Solana public address, Base58-encoded private key, and raw private key bytes.
         """
         # generate the seed from the mnemonic
         seed_bytes = Bip39SeedGenerator(self.mnemonic).Generate(self.password)
@@ -32,8 +32,12 @@ class SolanaWalletGenerator:
         # concatenate private and public key bytes for Solana format
         key_pair = priv_key_bytes + public_key_bytes
 
-        # return address and Base58-encoded private key
-        return bip44_acc_ctx.PublicKey().ToAddress(), base58.Base58Encoder.Encode(key_pair)
+        # return address, Base58-encoded private key, and raw private key bytes
+        return (
+            bip44_acc_ctx.PublicKey().ToAddress(), 
+            base58.Base58Encoder.Encode(key_pair),
+            list(priv_key_bytes)  # Convert bytes to list for readable output
+        )
 
 # function to create a specified number of Solana wallets
 def create_solana_wallets(num_wallets, output_file):
@@ -46,25 +50,31 @@ def create_solana_wallets(num_wallets, output_file):
     for i in range(num_wallets):
         # generate a random mnemonic for each wallet
         mnemonic = Bip39MnemonicGenerator().FromWordsNumber(Bip39WordsNum.WORDS_NUM_12)
-        mnemonic_str = mnemonic.ToStr()  # convert Bip39Mnemonic object to string
+        mnemonic_str = mnemonic.ToStr()
         generator = SolanaWalletGenerator(mnemonic_str)
-        public_key, private_key = generator.get_address_and_private_key()
+        public_key, private_key, private_key_bytes = generator.get_address_and_private_key()
         wallets.append({
             "public_key": public_key,
             "private_key": private_key,
+            "private_key_bytes": private_key_bytes,
             "mnemonic": mnemonic_str
         })
 
     # write wallets to a CSV file
     with open(output_file, mode='w', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(["Public Key", "Private Key (Base58)", "Mnemonic"])
+        writer.writerow(["Public Key", "Private Key (Base58)", "Private Key (Bytes)", "Mnemonic"])
         for wallet in wallets:
-            writer.writerow([wallet["public_key"], wallet["private_key"], wallet["mnemonic"]])
+            writer.writerow([
+                wallet["public_key"], 
+                wallet["private_key"],
+                wallet["private_key_bytes"],
+                wallet["mnemonic"]
+            ])
 
     print(f"Successfully created {num_wallets} wallets. Details saved to {output_file}")
 
 if __name__ == "__main__":
     num_wallets = int(input("Enter the number of wallets to create: "))
-    output_file = "output/solana_wallets.csv"  
+    output_file = "output/solana_wallets_v2.csv"  
     create_solana_wallets(num_wallets, output_file)
